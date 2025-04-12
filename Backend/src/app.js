@@ -14,7 +14,7 @@ import { app,server } from "./utils/socket.js";
 
 app.use(cors({
     origin: process.env.CORS_ORIGIN,
-    credentials:true
+    // credentials:true
 })) 
 
 //3 major config of express

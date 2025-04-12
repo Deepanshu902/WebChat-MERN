@@ -1,83 +1,70 @@
-import mongoose from "mongoose"
+import User from "../models/user.model.js";
+import Message from "../models/message.model.js";
 
-import {User} from "../models/user.models.js"
+import cloudinary from "../lib/cloudinary.js";
+import { getReceiverSocketId, io } from "../lib/socket.js";
 
-import {Message} from "../models/message.model.js"
+export const getUsersForSidebar = async (req, res) => {
+  try {
+    const loggedInUserId = req.user._id;
+    const filteredUsers = await User.find({ _id: { $ne: loggedInUserId } }).select("-password");
 
-import {asyncHandler} from "../utils/asyncHandler.js"
-
-import {ApiError} from "../utils/ApiError.js"
-
-import {ApiResponse} from "../utils/ApiResponse.js"
-
-
-
-
-
-
-
-const getUsersForSideBar = asyncHandler(async(req,res)=>{
-
-    const loggedInUserId = req.user._id
-
-    const fitleredUsers =  await User.find({_id:{$ne:loggedInUserId}}).select("-password") // exclude logged In user
-
-    if(fitleredUsers.length===0){
-        throw new ApiError(501,"No user fetched")
-
-    }
-
-    return res.status(200).json(new ApiResponse(200,fitleredUsers,"Fetched Successfully"))
-})
-
-
-const getUserMessage = asyncHandler(async(req,res)=>{
-    const {userChatId} = req.params
-    const senderId = req.user._id
-    if(!userChatId){
-        throw new ApiError(501,"No userid get")
-    }
-    const message  = await Message.find({
-        $or:[{
-            
-                senderId:senderId,
-                receiverId:userChatId
-            },
-            {
-                senderId:userChatId,
-                receiverId:senderId
-            }
-        ]
-    })
-
-    if(!message.length===0){
-        return res.status(200).json(new ApiResponse(200, [], "No messages found between users or failed to fetch messages"));
-    }
-    return res.status(200).json(new ApiResponse(200,message,"Message Fetched Successfully"))
-})
-
-const sendMessage = asyncHandler(async(req,res)=>{
-    const {userToSendMessage} = req.params
-    const {text} = req.body
-    const senderId = req.user._id
-
-  if(!text){
-    throw new ApiError(400,"Message or image is required")
+    res.status(200).json(filteredUsers);
+  } catch (error) {
+    console.error("Error in getUsersForSidebar: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
   }
-  const sendMessage = await Message.create({
-    senderId,
-    userToSendMessage,
-    text
+};
 
-  })
-  await sendMessage.save()
+export const getMessages = async (req, res) => {
+  try {
+    const { id: userToChatId } = req.params;
+    const myId = req.user._id;
 
-  res.status(200).json(new ApiResponse(200,sendMessage,"Message Send"))
-    
-})
+    const messages = await Message.find({
+      $or: [
+        { senderId: myId, receiverId: userToChatId },
+        { senderId: userToChatId, receiverId: myId },
+      ],
+    });
 
+    res.status(200).json(messages);
+  } catch (error) {
+    console.log("Error in getMessages controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};
 
-export {
-    getUsersForSideBar,getUserMessage,sendMessage
-    
-}
+export const sendMessage = async (req, res) => {
+  try {
+    const { text, image } = req.body;
+    const { id: receiverId } = req.params;
+    const senderId = req.user._id;
+
+    let imageUrl;
+    if (image) {
+      // Upload base64 image to cloudinary
+      const uploadResponse = await cloudinary.uploader.upload(image);
+      imageUrl = uploadResponse.secure_url;
+    }
+
+    const newMessage = new Message({
+      senderId,
+      receiverId,
+      text,
+      image: imageUrl,
+    });
+
+    await newMessage.save();
+
+    const receiverSocketId = getReceiverSocketId(receiverId);
+    if (receiverSocketId) {
+      io.to(receiverSocketId).emit("newMessage", newMessage);
+    }
+
+    res.status(201).json(newMessage);
+  } catch (error) {
+    console.log("Error in sendMessage controller: ", error.message);
+    res.status(500).json({ error: "Internal server error" });
+  }
+};

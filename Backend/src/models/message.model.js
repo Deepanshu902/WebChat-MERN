@@ -1,30 +1,27 @@
-import mongoose from "mongoose"
+import mongoose from "mongoose";
 
-import {User} from "../models/user.models.js"
+const messageSchema = new mongoose.Schema(
+  {
+    senderId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    receiverId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    text: {
+      type: String,
+    },
+    image: {
+      type: String,
+    },
+  },
+  { timestamps: true }
+);
 
-const messageSchema = mongoose.Schema(
-        {
-            senderId:{
-                type:mongoose.Schema.Types.ObjectId,
-                ref:"User",
-                required:true
-            },
-            receiverId:{
-                type:mongoose.Schema.Types.ObjectId,
-                ref:"User",
-                required:true
-            },
-            text:{
-                type:String // none of them are req as we can only send text or image or both so no required feild here 
-            },
-            image:{
-                type:String
-            }
+const Message = mongoose.model("Message", messageSchema);
 
-
-            },
-        {timestamp:true})
-
-
-
-        export const Message = mongoose.model("Message",messageSchema)
+export default Message;

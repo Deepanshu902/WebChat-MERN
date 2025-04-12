@@ -125,7 +125,6 @@ json( new ApiResponse(200,loggedInUser,"Login Success"))
     const updateAccountDetails = asyncHandler(async(req,res)=>{
 
       const {name,email} = req.body
-      N
             if(!name && !email){
                throw new ApiError(401,"all feilds are req")
             }
